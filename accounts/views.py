@@ -19,12 +19,13 @@ client = Client(account_sid, auth_token)
 
 otp = None
 
+
 def send_otp(request,new_otp):
     otp = new_otp
     request.session['otp'] = otp
     message = client.messages.create(
         body=f"Here is the OTP {otp} for account activation.",
-        from_='+12344053612',
+        from_=str(os.environ['TWILIO_TRIAL_PHONE_NUMBER']),
         to='+91'+str(request.data['phone_number'])
     )
 
