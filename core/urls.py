@@ -20,4 +20,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     # path('login-panel/', include('rest_framework.urls')),
     path('',include('accounts.urls')),
+    path("product/", include('products.urls')),
 ]

@@ -1,11 +1,13 @@
 from django.urls import path 
-from .views import RegisterAPI,VerifyOTPAPI,LoginAPI,ResentOtp
+from .views import RegisterAPI,VerifyOTPAPI,LoginAPI,LogoutAPI,HomeAPI
                     
 
 
 urlpatterns = [
     path("register/", RegisterAPI.as_view(), name="register"),
-    path("verify/", VerifyOTPAPI.as_view() , name="verify"),
+    path("verify_otp/", VerifyOTPAPI.as_view() , name="verify-otp"),
     path("login/", LoginAPI.as_view(), name="login"),
-    path("resent_otp/", ResentOtp.as_view(), name="resent-otp")
+    path("logout/", LogoutAPI.as_view(), name="logout"),
+    path("home/", HomeAPI.as_view(), name="home"),
+    
 ]
