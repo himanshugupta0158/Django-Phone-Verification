@@ -50,14 +50,15 @@ class RegisterAPI(GenericAPIView):
     
     @csrf_exempt
     def post(self, request):
-        serializer = self.get_serializer(data = request.data)
-        if serializer.is_valid():
-            request.session['phone_number'] = request.data['phone_number']
-            send_otp(request,random.randint(10000,99999))
-            user = serializer.save()
-            return Response(serializer.data)
-        
-        return Response(serializer.errors , status = 400)
+        if request.session['otp'] :
+            serializer = self.get_serializer(data = request.data)
+            if serializer.is_valid():
+                serializer.save()
+                del request.session['otp']
+                return redirect('login')
+            return Response(serializer.errors , status = 400)
+        else:
+            return redirect('login')
 
 # verifying user both for login and register 
 class VerifyOTPAPI(GenericAPIView):
@@ -73,46 +74,47 @@ class VerifyOTPAPI(GenericAPIView):
         if request.session['otp'] :
             if int(request.data['otp']) == int(request.session['otp']) :
                 user = User.objects.filter(phone_number=request.session['phone_number']).first()
-                user.is_active = True 
-                user.save()
-                login(request , user)
-                print('logging in')
-                request.session['login_user'] = user.username
-                return redirect('home')
+                if user :
+                    user.is_active = True 
+                    user.save()
+                    login(request , user)
+                    print('logging in')
+                    request.session['login_user'] = user.username
+                    return redirect('home')
+                else:
+                    return redirect('register')
         else:
-             Response({'result' : 'Regenerate OTP for login'} , status=401)   
+            return Response({'result' : 'Regenerate OTP for login'} , status=401)   
         return Response({'result' : 'Invalid OTP'} , status=400)
     
 
-# logging user via phone number
+# logging and registering both user have to verify phone number
 class LoginAPI(GenericAPIView):
     serializer_class = LoginSerializer
     
     
     def get(self , request):
-        return Response({'Message' : 'User Login'})
+        return Response({'Message' : 'For User Login and Register , Enter you Phone Number and verify it.'})
     
     @csrf_exempt
     def post(self, request):
         request.session['phone_number'] = request.data['phone_number']
-        user = User.objects.filter(phone_number=request.session['phone_number']).first()
-        if user :
-            if user.is_active == True :
-                send_otp(request,random.randint(10000,99999))
-                return redirect('verify-otp')
-            else:
-                return Response({"Result" : "User's account is not active check your mobile number's SMS."} , status = 400)
-        else:
-            del request.session['phone_number']
-            return redirect('register')
+        send_otp(request,random.randint(10000,99999))
+        return redirect('verify-otp')
+    
 
 # logging out users
 class LogoutAPI(GenericAPIView):
 
     def get(self,request):
-        logout(request)
-        request.session.flush()
-        return Response({'result' : 'User loggout successfully'} , status=200)        
+        try:
+            logout(request)
+            del request.session['otp']
+            del request.session['phone_number']
+            return Response({'result' : 'User loggout successfully'} , status=200)        
+        except:
+            return redirect('login')
+            
 
 
 
