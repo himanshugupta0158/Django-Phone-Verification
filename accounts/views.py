@@ -21,6 +21,7 @@ from twilio.rest import Client
 # Create your views here.
 
 # setting accounts_id and auth_token for SMS
+
 account_sid = os.environ['TWILIO_ACCOUNT_SID']
 auth_token = os.environ['TWILIO_AUTH_TOKEN']
 client = Client(account_sid, auth_token)
