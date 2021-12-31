@@ -13,7 +13,7 @@ from rest_framework.authentication import BasicAuthentication
 
 from .serializers import RegisterSerializer , LoginSerializer , OTPVerificationSerializer
 
-from .models import User
+from .models import User , UserOTP
 
 # twilio helps to sent SMS to mobile number but it need to be register on twilio site.
 from twilio.rest import Client
@@ -25,19 +25,14 @@ account_sid = os.environ['TWILIO_ACCOUNT_SID']
 auth_token = os.environ['TWILIO_AUTH_TOKEN']
 client = Client(account_sid, auth_token)
 
-otp = None
-
 # os.environ['TWILIO_TRIAL_PHONE_NUMBER']
 
 # body code for message sending
-def send_otp(request,new_otp):
-    otp = new_otp
-    # saving new otp in session
-    request.session['otp'] = otp
+def send_otp(otp):
     message = client.messages.create(
-        body=f"Here is the OTP {otp} for account activation.",
+        body=f"Here is the OTP {otp.otp} for phone number verification.",
         from_=os.environ['TWILIO_TRIAL_PHONE_NUMBER'],
-        to='+91'+str(request.data['phone_number'])
+        to='+91'+str(otp.phone_number)
     )
 
 
@@ -50,14 +45,15 @@ class RegisterAPI(GenericAPIView):
     
     @csrf_exempt
     def post(self, request):
-        if request.session['otp'] :
+        otp = UserOTP.objects.filter(phone_number=request.data['phone_number'])
+        if otp :
             serializer = self.get_serializer(data = request.data)
             if serializer.is_valid():
                 serializer.save()
-                del request.session['otp']
                 return redirect('login')
             return Response(serializer.errors , status = 400)
         else:
+            request.session['login_msg'] = 'OTP not found for this number.Login in again'
             return redirect('login')
 
 # verifying user both for login and register 
@@ -69,23 +65,28 @@ class VerifyOTPAPI(GenericAPIView):
         
     @csrf_exempt
     def post(self , request):
-        print("OTP : ",request.session['otp'])
-        print("OTP : ",request.data['otp'])
-        if request.session['otp'] :
-            if int(request.data['otp']) == int(request.session['otp']) :
-                user = User.objects.filter(phone_number=request.session['phone_number']).first()
+        otp = UserOTP.objects.filter(phone_number=request.session['phone_number']).first()
+        if otp :
+            if int(request.data['otp']) == int(otp.otp) :
+                user = User.objects.filter(phone_number=otp.phone_number).first()
                 if user :
-                    user.is_active = True 
-                    user.save()
+                    if user.is_active == False :
+                        user.is_active = True 
+                        user.save()
+                    else:
+                        pass
                     login(request , user)
                     print('logging in')
-                    request.session['login_user'] = user.username
+                    UserOTP.objects.filter(phone_number=otp.phone_number).delete()
                     return redirect('home')
                 else:
                     return redirect('register')
+            else:
+                request.session['login_msg'] = 'Invalid OTP'
+                return redirect('login')
         else:
-            return Response({'result' : 'Regenerate OTP for login'} , status=401)   
-        return Response({'result' : 'Invalid OTP'} , status=400)
+            request.session['login_msg'] = 'Regenerate OTP for login or register , OTP not found.'
+            return redirect('login')
     
 
 # logging and registering both user have to verify phone number
@@ -94,12 +95,27 @@ class LoginAPI(GenericAPIView):
     
     
     def get(self , request):
-        return Response({'Message' : 'For User Login and Register , Enter you Phone Number and verify it.'})
+        try:
+            print('try')
+            if request.session['login_msg'] :
+               return Response({'Message' :request.session['login_msg'] }) 
+            else:
+               return Response({'Message' : 'For User Login and Register , Enter you Phone Number and verify it.'})
+        except:
+            print('except')
+            return Response({'Message' : 'For User Login and Register , Enter you Phone Number and verify it.'})
     
     @csrf_exempt
     def post(self, request):
+        try:
+            del request.session['login_msg']
+        except:
+            pass
         request.session['phone_number'] = request.data['phone_number']
-        send_otp(request,random.randint(10000,99999))
+        UserOTP.objects.filter(phone_number=request.data['phone_number']).delete()
+        otp_details = UserOTP(phone_number=request.data['phone_number'] , otp = random.randint(10000,99999))
+        otp_details.save()
+        send_otp(otp_details)
         return redirect('verify-otp')
     
 
@@ -109,8 +125,6 @@ class LogoutAPI(GenericAPIView):
     def get(self,request):
         try:
             logout(request)
-            del request.session['otp']
-            del request.session['phone_number']
             return Response({'result' : 'User loggout successfully'} , status=200)        
         except:
             return redirect('login')
@@ -123,5 +137,7 @@ class HomeAPI(GenericAPIView):
     permission_classes = [IsAuthenticated]
     
     def get(self , request):
+        user = request.user
+        UserOTP.objects.filter(phone_number=user.phone_number).delete()
         return Response({'Home' : 'This is Home Page'} , status=201)
     

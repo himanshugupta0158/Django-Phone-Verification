@@ -7,7 +7,7 @@ class CustomUserManager(BaseUserManager):
     use_in_migrations = True
 
     # creating new normal user and normal user are not active until they were verified.
-    def create_user(self , phone_number , email , username ,password=None, **other_fields):
+    def create_user(self , phone_number , email , firstname , lastname ,password=None, **other_fields):
         if not phone_number :
             raise ValueError(gettext_lazy('You must provide phone number'))
         
@@ -17,7 +17,8 @@ class CustomUserManager(BaseUserManager):
             email = None
         user = self.model(phone_number=phone_number,
             email=email,
-            username=username,
+            firstname=firstname,
+            lastname=lastname,
             **other_fields
             )
         user.set_password(password)
@@ -26,7 +27,7 @@ class CustomUserManager(BaseUserManager):
         return user 
     
     # creating new super user and super user will always be active
-    def create_superuser(self , phone_number , email , username , password , **other_fields):
+    def create_superuser(self , phone_number , email , firstname , lastname , password , **other_fields):
         other_fields.setdefault('is_staff' , True)
         other_fields.setdefault('is_superuser' , True)
         other_fields.setdefault('is_active' , True)
@@ -39,4 +40,4 @@ class CustomUserManager(BaseUserManager):
             raise ValueError(
                 'Superuser must be assigned to is_superuser=True.'
             )
-        return self.create_user(phone_number , email , username , password , **other_fields)
+        return self.create_user(phone_number , email , firstname , lastname  , password , **other_fields)
